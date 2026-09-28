@@ -15,6 +15,7 @@ Cel: darmowe, przyjemne wizualnie narzędzie astrologiczne, które samo się utr
 ## Funkcje
 
 - **Horoskop dzienny** dla 12 znaków zodiaku, generowany przez AI
+- **Znaki zodiaku** — strona zbiorcza i 12 statycznych stron znaków (charakter, miłość, praca, zgodność, kamienie, FAQ), czytelnych dla wyszukiwarek bez JavaScriptu
 - **Tarot dnia** — losowana karta z interpretacją
 - **Kalkulator faz Księżyca** — na dowolną datę, w tym lunację urodzin
 - **Zgodność znaków** — kalkulator kompatybilności dwóch znaków
@@ -22,22 +23,28 @@ Cel: darmowe, przyjemne wizualnie narzędzie astrologiczne, które samo się utr
 - **Kamienie i minerały** przypisane do znaków zodiaku
 - **Księga smaków** — przepisy kulinarne pod znak zodiaku
 - **Dziennik kosmiczny** — prywatne notatki użytkownika (zapis wyłącznie lokalnie, `localStorage`, bez wysyłania na serwer)
-- **Generator artykułów blogowych** o astrologii/ezoteryce (AI na żądanie użytkownika)
+- **Generator artykułów AI** o astrologii/ezoteryce — osobna strona `artykuly-ai.html`, bez reklam i z `noindex`, oddzielona od treści redakcyjnych
 
 ## Integracja AI
 
-Treści generowane na żywo (horoskop, sennik, artykuły) idą przez `netlify/functions/groq.js` — lekką funkcję serverless, która przekazuje zapytanie do [Groq API](https://groq.com/) (model `llama-3.3-70b-versatile`). Klucz API trzymany jest w zmiennej środowiskowej Netlify i nigdy nie trafia do przeglądarki — frontend woła własny endpoint `/api/groq`, nie Groq bezpośrednio.
+Treści generowane na żywo (horoskop, sennik, artykuły) idą przez `netlify/functions/groq.js` — funkcję serverless, która przekazuje zapytanie do [Groq API](https://groq.com/) (model `llama-3.3-70b-versatile`). Klucz API jest tylko w zmiennej środowiskowej Netlify i nigdy nie trafia do przeglądarki.
+
+Proxy jest zabezpieczone przed nadużyciem: blokuje wywołania z obcych domen (nagłówek `Origin`), dopuszcza tylko wybrane modele, przycina `max_tokens` i odrzuca zbyt długie zapytania. Dodatkowe dozwolone adresy (np. podgląd na `*.netlify.app`) ustawia się zmienną `EXTRA_ALLOWED_ORIGINS`.
 
 ## Reklamy i zgodność z RODO
 
 - Google AdSense (`ca-pub-6047762879323596`), jednostki reklamowe rozmieszczone na wszystkich stronach z treścią (patrz `ads.txt`).
-- **Baner zgody na cookies (`consent.js`)** — reklama nie ładuje się, dopóki użytkownik nie wybierze reklam spersonalizowanych albo tylko niezbędnych (`requestNonPersonalizedAds = 1`), zgodnie z [wytycznymi Google dla wydawców z ruchem z EOG/UK](https://support.google.com/adsense/answer/9007336). Wybór zapamiętywany w `localStorage`.
+- **Zgoda na cookies przez certyfikowany CMP Google (IAB TCF v2)** — komunikat „Przepisy europejskie” konfigurowany w AdSense (Prywatność i wiadomości), wymagany przez Google od 2024 r. dla ruchu z EOG, UK i Szwajcarii. Tag AdSense sam wstrzymuje personalizację do decyzji użytkownika — bez własnego kodu zgody.
+- Reklamy tylko na ekranach z treścią — bez jednostek na stronie kontaktu, polityce prywatności i w dzienniku (zgodnie z zasadami Google Publisher Policies).
 - Polityka prywatności i regulamin opisują podstawę prawną (RODO), zakres danych i rolę Google AdSense/Analytics jako podmiotów trzecich.
 
 ## Struktura projektu
 
 ```
 ├── index.html                    # Horoskop dzienny (strona główna)
+├── znaki-zodiaku.html            # Strona zbiorcza znaków zodiaku
+├── znak-*.html                   # 12 stron znaków (baran, byk, … ryby)
+├── artykuly-ai.html              # Generator artykułów AI (noindex, bez reklam)
 ├── tarot-dnia.html                # Karta tarota dnia
 ├── fazy-ksiezyca.html             # Kalkulator faz Księżyca
 ├── zgodnosc-znakow.html           # Kalkulator zgodności znaków
@@ -51,7 +58,6 @@ Treści generowane na żywo (horoskop, sennik, artykuły) idą przez `netlify/fu
 ├── regulamin.html                 # Regulamin serwisu
 ├── style.css                      # Style całej witryny
 ├── script.js                      # Logika interfejsu i obliczeń
-├── consent.js                     # Baner zgody na cookies reklamowe (AdSense)
 ├── ads.txt                        # Autoryzacja sprzedawców reklam (Google AdSense)
 ├── sitemap.xml                    # Mapa strony dla robotów wyszukiwarek
 ├── robots.txt                     # Reguły indeksowania (wskazuje na sitemap.xml)
@@ -79,9 +85,9 @@ netlify dev
 ## Reklamy (Google AdSense)
 
 - Klient AdSense: `ca-pub-6047762879323596` (patrz `ads.txt` i tagi `<ins class="adsbygoogle">` na poszczególnych stronach).
-- Przed pierwszym wyświetleniem reklamy użytkownik widzi baner zgody (`consent.js`) i wybiera reklamy **spersonalizowane** albo **tylko niezbędne** (`requestNonPersonalizedAds = 1`), zgodnie z wytycznymi Google dla wydawców z ruchem z EOG/UK: https://support.google.com/adsense/answer/9007336
-- Wybór użytkownika jest zapamiętywany w `localStorage` (`gwz_ad_consent`).
-- Nowe jednostki reklamowe dodajemy jako `<ins class="adsbygoogle">...</ins>` + `<script>gwzPushAd();</script>` (zamiast domyślnego `push({})`), żeby baner nadal działał poprawnie.
+- Zgoda użytkowników z EOG/UK/Szwajcarii: komunikat „Przepisy europejskie” w AdSense → Prywatność i wiadomości (certyfikowany CMP Google, IAB TCF). Komunikat jest dostarczany przez ten sam tag `adsbygoogle.js` — w kodzie strony nie ma osobnego skryptu zgody.
+- Nowe jednostki reklamowe dodajemy standardowo: `<ins class="adsbygoogle">...</ins>` + `<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>`.
+- Nie wstawiamy reklam na strony bez treści wydawcy (kontakt, polityka prywatności, regulamin, dziennik) ani na stronę z treściami generowanymi automatycznie (`artykuly-ai.html`).
 
 ## Deploy
 
